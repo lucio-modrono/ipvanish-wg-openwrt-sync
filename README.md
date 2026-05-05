@@ -36,9 +36,9 @@ IPVANISH_USER=tu_email@ejemplo.com
 IPVANISH_PASS=tu_contraseña
 ROUTER_IP=192.168.1.1
 ROUTER_PASS=contraseña_ssh_router
-COUNTRY_FILTER=codigo_pais
+VPN_COUNTRY_CODE=codigo_pais
 ```
-El código de pais COUNTRY_FILTER en formato [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
+El código de pais VPN_COUNTRY_CODE en formato [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
 
 ### 3. Ejecución con Docker
 Construye y ejecuta el contenedor:
