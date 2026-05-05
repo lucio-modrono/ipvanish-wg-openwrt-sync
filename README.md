@@ -49,7 +49,14 @@ docker run --env-file .env ipvanish-sync
 
 ## 🔧 Configuración en OpenWrt
 
-### 1. Script para actualizar la interfaz Wireguard
+### 1. Preparar el entorno
+
+Instala las herramientas de WireGuard si no lo has hecho:
+```bash
+opkg update && opkg install wireguard-tools
+```
+
+### 2. Script para actualizar la interfaz Wireguard
 Para que el despliegue funcione, el router debe tener un script en `/usr/bin/update_wg.sh` que procese el archivo `.conf` subido. Puedes encontrar el código del script en la carpeta `openwrt/` de este repositorio.
 
 Asegúrate de dar permisos de ejecución:
@@ -57,7 +64,7 @@ Asegúrate de dar permisos de ejecución:
 chmod +x /usr/bin/update_wg.sh
 ```
 
-### 2. Consideración sobre el Firewall
+### 3. Consideración sobre el Firewall
 La primera vez que se ejecute el script, será necesario configurar la interfaz en la zona correcta del firewall
 
 Puedes hacerlo una sola vez por terminal:
