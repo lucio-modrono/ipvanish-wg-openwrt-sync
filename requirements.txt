@@ -1,0 +1,4 @@
+selenium
+paramiko
+python-dotenv
+webdriver-manager
