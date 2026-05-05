@@ -24,7 +24,9 @@ def get_vpn_config():
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
     # Directorio de descarga dentro del contenedor
     prefs = {"download.default_directory": "/tmp/"}
     chrome_options.add_experimental_option("prefs", prefs)
@@ -33,36 +35,29 @@ def get_vpn_config():
     driver = webdriver.Chrome(service=service, options=chrome_options)
 
     try:
-        # Lógica de Login en IPVanish
-        driver.get("https://sso.ipvanish.com/")
-        # Wait for main page to load
         try:
-            WebDriverWait(driver=driver, timeout=120, poll_frequency=3).until(
-                expected_conditions.visibility_of(
-                    driver.find_element(by=By.CSS_SELECTOR, value="button[tabindex='3'][class^='button_btn']")
-                )
+            # Lógica de Login en IPVanish
+            driver.get("https://sso.ipvanish.com/")
+            # Esperar y rellenar usuario
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.NAME, "email"))
+            ).send_keys(os.getenv("IPVANISH_USER"))
+            
+            # Rellenar contraseña
+            driver.find_element(By.NAME, "password").send_keys(os.getenv("IPVANISH_PASS"))
+            
+            # Hacer clic en el botón "Sign in"
+            boton_login = WebDriverWait(driver, 10).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "button[tabindex='3'][class^='button_btn']"))
             )
+            boton_login.click()
+            
+            print("Login successful.")
+
         except TimeoutException:
             exit_with_error(message="Could not access login page.")
         except NoSuchElementException:
             exit_with_error(message="Could not find button Login Submit. Exiting.")
-
-        driver.find_element(By.NAME, "email").send_keys(os.getenv("IPVANISH_USER"))
-        driver.find_element(By.NAME, "password").send_keys(os.getenv("IPVANISH_PASS"))
-        driver.find_element(By.CSS_SELECTOR, "button[tabindex='3'][class^='button_btn']").click()
-        
-        # Wait for main page to load
-        try:
-            WebDriverWait(driver=driver, timeout=120, poll_frequency=3).until(
-                expected_conditions.visibility_of(
-                    driver.find_element(by=By.CSS_SELECTOR, value="div[class^='app-layout_mainContainer']")
-                )
-            )
-            print("Login successful")
-        except TimeoutException:
-            exit_with_error(message="Could not login. Check if account is blocked.")
-        except NoSuchElementException:
-            exit_with_error(message="Could not find element Main Layout. Exiting.")
 
         # Extraer las cookies de Selenium para usarlas con la librería requests
         cookies = {c['name']: c['value'] for c in driver.get_cookies()}
@@ -76,15 +71,15 @@ def get_vpn_config():
         servers = response.json()
     
         # 3. Filtrar por CountryCode y buscar la mayor Capacity
+        COUNTRY_FILTER = os.getenv("VPN_COUNTRY_CODE", "NL")
         filtered_servers = [s for s in servers if s.get("countryCode") == COUNTRY_FILTER]
-        
         if not filtered_servers:
-            exit_with_error(message=f"No se encontraron servidores para el país: {COUNTRY_FILTER}")
+            exit_with_error(message=f"Could not find server for country: {COUNTRY_FILTER}")
     
         # Ordenar por capacidad descendente y tomar el primero
         best_server = max(filtered_servers, key=lambda x: x['capacity'])
         target_hostname = best_server['hostname']
-        print(f"Servidor seleccionado: {target_hostname} (Capacidad: {best_server['capacity']})")
+        print(f"Server selected: {target_hostname} (Capacidad: {best_server['capacity']})")
     
         # 4. Generar Payload y obtener configuración WireGuard
         payload = {
@@ -112,6 +107,9 @@ def get_vpn_config():
 
         print("Descarga completada en el contenedor.")
         return "/tmp/wireguard_config.conf" 
+
+    except Exception as e:
+        exit_with_error(message=f"Error: {e}")
     finally:
         driver.quit()
 
