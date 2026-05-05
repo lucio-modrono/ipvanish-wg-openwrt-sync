@@ -13,8 +13,7 @@ RUN apk add --no-cache \
     make
 
 # 2. Configurar variables de entorno para Selenium
-ENV CHROME_BIN=/usr/bin/chromium-browser \
-    CHROME_PATH=/usr/lib/chromium/ \
+ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
