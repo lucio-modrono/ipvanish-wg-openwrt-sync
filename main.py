@@ -24,10 +24,10 @@ def get_vpn_config():
 
     try:
         # Lógica de Login en IPVanish
-        driver.get("https://ipvanish.com")
-        driver.find_element(By.NAME, "username").send_keys(os.getenv("IPVANISH_USER"))
+        driver.get("https://sso.ipvanish.com/")
+        driver.find_element(By.NAME, "email").send_keys(os.getenv("IPVANISH_USER"))
         driver.find_element(By.NAME, "password").send_keys(os.getenv("IPVANISH_PASS"))
-        driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
+        driver.find_element(By.CSS_SELECTOR, "button[tabindex='3'][class^='button_btn']").click()
         
         time.sleep(5)
         # Aquí debes añadir los selectores específicos para navegar 
