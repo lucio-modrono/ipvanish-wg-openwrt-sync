@@ -57,7 +57,7 @@ def get_vpn_config():
         except TimeoutException:
             exit_with_error(message="Could not access login page.", driver)
         except NoSuchElementException:
-            exit_with_error(message="Could not find button Login Submit. Exiting.", driver)
+            exit_with_error(message="Could not find button Login Submit. Exiting.", driver=driver)
 
         # Extraer las cookies de Selenium para usarlas con la librería requests
         cookies = {c['name']: c['value'] for c in driver.get_cookies()}
@@ -75,12 +75,12 @@ def get_vpn_config():
         COUNTRY_FILTER = os.getenv("VPN_COUNTRY_CODE", "NL")
         filtered_servers = [s for s in servers if s.get("countryCode") == COUNTRY_FILTER]
         if not filtered_servers:
-            exit_with_error(message=f"Could not find server for country: {COUNTRY_FILTER}", driver)
+            exit_with_error(message=f"Could not find server for country: {COUNTRY_FILTER}", driver=driver)
     
         # Ordenar por capacidad descendente y tomar el primero
         best_server = max(filtered_servers, key=lambda x: x['capacity'])
         target_hostname = best_server['hostname']
-        print(f"Server selected: {target_hostname} (Capacidad: {best_server['capacity']})", driver)
+        print(f"Server selected: {target_hostname} (Capacidad: {best_server['capacity']})", driver=driver)
     
         # 4. Generar Payload y obtener configuración WireGuard
         payload = {
@@ -104,7 +104,7 @@ def get_vpn_config():
                 f.write(config_text)
             return local_path
         else:
-            exit_with_error(message=f"Error al obtener config: {config_response.status_code} - {config_response.text}", driver)
+            exit_with_error(message=f"Error al obtener config: {config_response.status_code} - {config_response.text}", driver=driver)
 
         print("Descarga completada en el contenedor.")
         return "/tmp/wireguard_config.conf" 
