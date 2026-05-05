@@ -31,7 +31,7 @@ def get_vpn_config():
     prefs = {"download.default_directory": "/tmp/"}
     chrome_options.add_experimental_option("prefs", prefs)
     
-    service = Service(executable_path=os.environ.get("CHROMEDRIVER_PATH"))
+    service = Service(executable_path=os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver"))
     driver = webdriver.Chrome(service=service, options=chrome_options)
 
     try:
