@@ -1,0 +1,31 @@
+**/.git
+README.md
+
+# Seguridad: Credenciales y secretos
+.env
+auth.json
+*.pem
+*.key
+
+# Directorios de Scripts específicos para el Router
+openwrt/
+update_wg.sh
+
+# Python: Caché y entornos virtuales
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Git y configuración de Docker
+.git
+.gitignore
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Archivos del Sistema Operativo y logs
+.DS_Store
+Thumbs.db
+*.log
