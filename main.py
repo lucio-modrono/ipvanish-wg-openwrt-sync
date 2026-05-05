@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def exit_with_error(message):
+def exit_with_error(message, driver):
     print(str(message))
     driver.quit()
     exit(1)
@@ -55,9 +55,9 @@ def get_vpn_config():
             print("Login successful.")
 
         except TimeoutException:
-            exit_with_error(message="Could not access login page.")
+            exit_with_error(message="Could not access login page.", driver)
         except NoSuchElementException:
-            exit_with_error(message="Could not find button Login Submit. Exiting.")
+            exit_with_error(message="Could not find button Login Submit. Exiting.", driver)
 
         # Extraer las cookies de Selenium para usarlas con la librería requests
         cookies = {c['name']: c['value'] for c in driver.get_cookies()}
@@ -69,17 +69,18 @@ def get_vpn_config():
         # 2. Descargar JSON de servidores
         response = requests.get("https://account.ipvanish.com/api-v4/server", cookies=cookies)
         servers = response.json()
+        print(f"Servidores:\n{json.dumps(servers)}")
     
         # 3. Filtrar por CountryCode y buscar la mayor Capacity
         COUNTRY_FILTER = os.getenv("VPN_COUNTRY_CODE", "NL")
         filtered_servers = [s for s in servers if s.get("countryCode") == COUNTRY_FILTER]
         if not filtered_servers:
-            exit_with_error(message=f"Could not find server for country: {COUNTRY_FILTER}")
+            exit_with_error(message=f"Could not find server for country: {COUNTRY_FILTER}", driver)
     
         # Ordenar por capacidad descendente y tomar el primero
         best_server = max(filtered_servers, key=lambda x: x['capacity'])
         target_hostname = best_server['hostname']
-        print(f"Server selected: {target_hostname} (Capacidad: {best_server['capacity']})")
+        print(f"Server selected: {target_hostname} (Capacidad: {best_server['capacity']})", driver)
     
         # 4. Generar Payload y obtener configuración WireGuard
         payload = {
@@ -103,7 +104,7 @@ def get_vpn_config():
                 f.write(config_text)
             return local_path
         else:
-            raise Exception(f"Error al obtener config: {config_response.status_code} - {config_response.text}")        
+            exit_with_error(message=f"Error al obtener config: {config_response.status_code} - {config_response.text}", driver)
 
         print("Descarga completada en el contenedor.")
         return "/tmp/wireguard_config.conf" 
