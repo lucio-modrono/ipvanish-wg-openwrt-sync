@@ -34,9 +34,9 @@ Crea un archivo `.env` basado en el ejemplo (no incluido en el repositorio por s
 ```env
 IPVANISH_USER=tu_email@ejemplo.com
 IPVANISH_PASS=tu_contraseña
+VPN_COUNTRY_CODE=codigo_pais
 ROUTER_IP=192.168.1.1
 ROUTER_PASS=contraseña_ssh_router
-VPN_COUNTRY_CODE=codigo_pais
 ```
 El código de pais VPN_COUNTRY_CODE en formato [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
 
