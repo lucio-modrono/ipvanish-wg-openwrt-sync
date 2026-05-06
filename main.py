@@ -71,7 +71,7 @@ def get_vpn_config():
     
         # 2. Descargar JSON de servidores
         try:
-            resp_servers = session.get("https://ipvanish.com/api-v4/server")
+            resp_servers = session.get("https://account.ipvanish.com/api-v4/server")
             resp_servers.raise_for_status()
             servers = resp_servers.json()
         except Exception as e:
@@ -106,7 +106,7 @@ def get_vpn_config():
         session.headers.update({"Content-Type": "application/json"})
     
         config_response = session.post(
-            "https://ipvanish.comapi-v4/wireguard/config",
+            "https://account.ipvanish.com/api-v4/wireguard/config",
             json=payload
         )
     
