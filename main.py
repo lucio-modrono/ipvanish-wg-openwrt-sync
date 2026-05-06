@@ -55,7 +55,7 @@ def get_vpn_config():
             print("Login successful.")
 
         except TimeoutException:
-            exit_with_error(message="Could not access login page.", driver)
+            exit_with_error(message="Could not access login page.", driver=driver)
         except NoSuchElementException:
             exit_with_error(message="Could not find button Login Submit. Exiting.", driver=driver)
 
