@@ -1,4 +1,4 @@
-selenium
+selenium-wire
 paramiko
 python-dotenv
 webdriver-manager
