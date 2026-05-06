@@ -12,7 +12,8 @@ RUN apk add --no-cache \
     openssl-dev \
     gcc \
     musl-dev \
-    make
+    make \
+    python3-dev
 
 # 2. Configurar variables de entorno para Selenium
 ENV CHROMEDRIVER_PATH=/usr/bin/chromedriver \
