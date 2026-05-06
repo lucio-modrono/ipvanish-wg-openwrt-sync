@@ -83,7 +83,7 @@ def get_vpn_config():
         # Ordenar por capacidad descendente y tomar el primero
         best_server = max(filtered_servers, key=lambda x: x['capacity'])
         target_hostname = best_server['hostname']
-        print(f"Server selected: {target_hostname} (Capacidad: {best_server['capacity']})", driver=driver)
+        print(f"Server selected: {target_hostname} (Capacidad: {best_server['capacity']})")
     
         # 4. Generar Payload y obtener configuración WireGuard
         payload = {
