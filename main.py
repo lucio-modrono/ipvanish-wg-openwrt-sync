@@ -67,7 +67,7 @@ def get_vpn_config():
         }
     
         # 2. Descargar JSON de servidores
-        response = requests.get("https://account.ipvanish.com/api-v4/server", cookies=cookies)
+        response = requests.get("https://account.ipvanish.com/api-v4/server?limitByCity=1", cookies=cookies)
         servers = response.json()
     
         # 3. Filtrar por CountryCode y buscar la mayor Capacity
