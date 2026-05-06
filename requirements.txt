@@ -2,3 +2,4 @@ selenium-wire
 paramiko
 python-dotenv
 webdriver-manager
+blinker==1.7.0
