@@ -60,6 +60,7 @@ def get_vpn_config():
             exit_with_error(message="Could not find button Login Submit. Exiting.", driver=driver)
 
         # Extraer las cookies de Selenium para usarlas con la librería requests
+        session = requests.Session()
         cookies = {c['name']: c['value'] for c in driver.get_cookies()}
         user_agent = driver.execute_script("return navigator.userAgent")
         session.headers.update({
