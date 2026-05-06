@@ -4,6 +4,8 @@ FROM python:3.9-alpine
 # 1. Instalar dependencias del sistema y Chromium
 # Instala Chromium y su driver, además de librerías para Paramiko (Cffi/Cryptography)
 RUN apk add --no-cache \
+    openssl \
+    ca-certificates \
     chromium \
     chromium-chromedriver \
     libffi-dev \
