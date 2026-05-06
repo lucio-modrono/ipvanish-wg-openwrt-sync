@@ -61,14 +61,21 @@ def get_vpn_config():
 
         # Extraer las cookies de Selenium para usarlas con la librería requests
         cookies = {c['name']: c['value'] for c in driver.get_cookies()}
-        headers = {
-            "User-Agent": driver.execute_script("return navigator.userAgent"),
-            "Content-Type": "application/json"
-        }
+        user_agent = driver.execute_script("return navigator.userAgent")
+        session.headers.update({
+            "User-Agent": user_agent,
+            "Accept": "application/json, text/plain, */*",
+            "Referer": "https://ipvanish.com" # Importante para evitar 403
+        })
     
         # 2. Descargar JSON de servidores
-        response = requests.get("https://account.ipvanish.com/api-v4/server?limitByCity=1", cookies=cookies)
-        servers = response.json()
+        try:
+            resp_servers = session.get("https://ipvanish.comapi-v4/server")
+            resp_servers.raise_for_status()
+            servers = resp_servers.json()
+        except Exception as e:
+            exit_with_error(message=f"Error en lista de servidores: {e}", driver=driver)
+            return
     
         # 3. Filtrar por CountryCode y buscar la mayor Capacity
         COUNTRY_FILTER = os.getenv("VPN_COUNTRY_CODE", "NL").strip().upper()
@@ -92,11 +99,14 @@ def get_vpn_config():
             "as_file": False
         }
     
-        config_response = requests.post(
-            "https://account.ipvanish.com/api-v4/wireguard/config",
-            json=payload,
-            cookies=cookies,
-            headers=headers
+        print(f"Solicitando configuración para {target_hostname}...")
+        
+        # Algunas APIs requieren esta cabecera específica para peticiones JSON
+        session.headers.update({"Content-Type": "application/json"})
+    
+        config_response = session.post(
+            "https://ipvanish.comapi-v4/wireguard/config",
+            json=payload
         )
     
         if config_response.status_code == 200:
@@ -105,13 +115,14 @@ def get_vpn_config():
             local_path = "/tmp/wireguard_config.conf"
             with open(local_path, "w") as f:
                 f.write(config_text)
+            print("Descarga completada en el contenedor.")
             return local_path
+        elif config_response.status_code == 403:
+            print("❌ Error 403: Acceso denegado. Posible falta de token o cabecera Referer.")
+            # Depuración: ver qué cookies tenemos en este momento
+            print(f"Cookies actuales: {session.cookies.get_dict()}")
         else:
             exit_with_error(message=f"Error al obtener config: {config_response.status_code} - {config_response.text}", driver=driver)
-
-        print("Descarga completada en el contenedor.")
-        return "/tmp/wireguard_config.conf" 
-
     except Exception as e:
         exit_with_error(message=f"Error: {e}", driver=driver)
     finally:
