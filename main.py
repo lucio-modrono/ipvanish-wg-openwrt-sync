@@ -72,9 +72,13 @@ def get_vpn_config():
         print(f"Servidores:\n{json.dumps(servers)}")
     
         # 3. Filtrar por CountryCode y buscar la mayor Capacity
-        COUNTRY_FILTER = os.getenv("VPN_COUNTRY_CODE", "NL")
-        filtered_servers = [s for s in servers if s.get("countryCode") == COUNTRY_FILTER]
+        COUNTRY_FILTER = os.getenv("VPN_COUNTRY_CODE", "NL").strip().upper()
+        filtered_servers = [s for s in servers if str(s.get("countryCode")).strip().upper() == COUNTRY_FILTER]
         if not filtered_servers:
+            # Extraemos códigos únicos para diagnóstico
+            codigos_encontrados = sorted(list(set(str(s.get("countryCode")) for s in servers)))
+            print(f"❌ No se encontró el código: '{COUNTRY_FILTER}'")
+            print(f"🔍 Códigos detectados en el JSON: {codigos_encontrados}")
             exit_with_error(message=f"Could not find server for country: {COUNTRY_FILTER}", driver=driver)
     
         # Ordenar por capacidad descendente y tomar el primero
