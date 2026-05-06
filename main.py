@@ -113,7 +113,7 @@ def get_vpn_config():
         return "/tmp/wireguard_config.conf" 
 
     except Exception as e:
-        exit_with_error(message=f"Error: {e}")
+        exit_with_error(message=f"Error: {e}", driver=driver)
     finally:
         driver.quit()
 
