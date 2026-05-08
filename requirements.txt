@@ -1,7 +1,4 @@
-selenium-wire
+undetected-chromedriver
 paramiko
 python-dotenv
-webdriver-manager
-blinker==1.7.0
-pyOpenSSL==22.0.0
-cryptography==36.0.2
+requests
