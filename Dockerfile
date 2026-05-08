@@ -13,14 +13,16 @@ RUN curl -fSsL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor
 # 2. Añadir el repositorio oficial de Chrome
 RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list
 
-# 3. Instalar Chrome y limpiar herramientas de instalación para reducir tamaño
+# 3. Instalar Chrome y crear enlace simbólico
 RUN apt-get update && apt-get install -y --no-install-recommends \
     google-chrome-stable \
-    && apt-get purge -y --auto-remove wget gnupg \
+    && ln -s /usr/bin/google-chrome-stable /usr/bin/google-chrome \
     && rm -rf /var/lib/apt/lists/*
 
-# Definir la ruta del binario de Chrome
-ENV CHROME_BIN=/usr/bin/google-chrome-stable \
+# 4. Verificación de seguridad: si el binario no existe, el build fallará aquí
+RUN ls -l /usr/bin/google-chrome
+
+ENV CHROME_BIN=/usr/bin/google-chrome \
     PYTHONUNBUFFERED=1
 
 WORKDIR /app
