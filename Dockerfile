@@ -2,13 +2,13 @@ FROM python:3.9-slim
 
 # Instalar dependencias mínimas para la instalación
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget \
+    curl \
     gnupg \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # 1. Descargar la llave GPG real de Google (URL correcta)
-RUN wget -q -O - https://google.com | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+RUN curl -fSsL https://google.com | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
 
 # 2. Añadir el repositorio oficial de Chrome
 RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://google.com stable main" > /etc/apt/sources.list.d/google-chrome.list
