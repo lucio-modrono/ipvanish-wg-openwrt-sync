@@ -1,24 +1,22 @@
 FROM python:3.9-slim
 
-# Instalar dependencias necesarias para manejar repositorios y Chrome
-RUN apt-get update && apt-get install -y \
+# Instalar dependencias mínimas para la instalación
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
-    curl \
     gnupg \
-    unzip \
     ca-certificates \
-    --no-install-recommends
+    && rm -rf /var/lib/apt/lists/*
 
-# 1. Descargar la llave de Google y guardarla en el nuevo formato (GPG)
+# 1. Descargar la llave GPG real de Google (URL correcta)
 RUN wget -q -O - https://google.com | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
 
-# 2. Añadir el repositorio de Google usando la llave específica
+# 2. Añadir el repositorio oficial de Chrome
 RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://google.com stable main" > /etc/apt/sources.list.d/google-chrome.list
 
-# 3. Instalar Google Chrome y limpiar archivos temporales
-RUN apt-get update && apt-get install -y \
+# 3. Instalar Chrome y limpiar herramientas de instalación para reducir tamaño
+RUN apt-get update && apt-get install -y --no-install-recommends \
     google-chrome-stable \
-    --no-install-recommends \
+    && apt-get purge -y --auto-remove wget gnupg \
     && rm -rf /var/lib/apt/lists/*
 
 # Definir la ruta del binario de Chrome
