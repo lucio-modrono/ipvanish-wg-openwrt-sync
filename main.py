@@ -334,7 +334,7 @@ def upload_to_openwrt(local_path):
         ssh.close()
         print("✅ Router actualizado correctamente.")
     except Exception as e:
-        print(f"Error al aplicar la configuración en el route OpenWRT: {e}")
+        print(f"Error al aplicar la configuración en el router OpenWRT: {e}")
 
 if __name__ == "__main__":
     path = get_vpn_config()
