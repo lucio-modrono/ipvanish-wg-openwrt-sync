@@ -224,8 +224,6 @@ def get_vpn_config():
 
         if not token:
             exit_with_error(message="⚠️ No se encontró el token. Revisa el nombre de la clave en el navegador.", driver=driver)
-        else:
-            print(f"✅ Token de autorización capturado: {token}")
 
         # Extraer las cookies de Selenium para usarlas con la librería requests
         session = requests.Session()
@@ -336,6 +334,17 @@ def upload_to_openwrt(local_path):
 
         stdin, stdout, stderr = ssh.exec_command(comando)
 
+        print("📡 Iniciando actualización remota...")
+
+        # Leer línea a línea conforme el router las envía
+        for line in stdout:
+            print(f"[OpenWrt]: {line.strip()}")
+
+        # Verificar si hubo errores al final
+        errors = stderr.read().decode('utf-8')
+        if errors:
+            print(f"❌ Error detectado:\n{errors}")
+
         # MUY IMPORTANTE: Leer la salida bloquea el script hasta que termine
         # Si no lees stdout, la conexión puede cerrarse antes de que el router procese el comando
         exit_status = stdout.channel.recv_exit_status()
@@ -343,7 +352,7 @@ def upload_to_openwrt(local_path):
         if exit_status != 0:
             print(f"❌ Error en el script: {stderr.read().decode()}")
         else:
-            print("✅ Router actualizado correctamente.")
+            print("🏁 Router actualizado correctamente.")
 
         ssh.close()
     except Exception as e:
