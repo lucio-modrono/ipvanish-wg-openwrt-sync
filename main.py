@@ -5,10 +5,7 @@ import os
 import time
 import requests
 import random
-#from seleniumwire import webdriver
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
-#from selenium.webdriver.chrome.options import Options
-#from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -27,8 +24,6 @@ def exit_with_error(message, driver):
     exit(1)
 
 def rellenar_campo_react(driver, element, valor):
-    #print(f"{element.get_attribute('name')}\n{valor}")
-
     actions = ActionChains(driver)
     # Mover el ratón al elemento con un pequeño offset aleatorio
     actions.move_to_element_with_offset(element, random.randint(-5, 5), random.randint(-5, 5))
@@ -57,15 +52,6 @@ def rellenar_campo_react(driver, element, valor):
             element.dispatchEvent(new Event(eventName, { bubbles: true }));
         })
     """, element, valor)
-
-def volcar_DOM(driver):
-    # 1. Volcar el HTML a un archivo
-    dom_content = driver.page_source
-    with open("/app/captures/debug_dom.html", "w", encoding="utf-8") as f:
-        f.write(dom_content)
-
-    print("📄 DOM volcado en /app/captures/debug_dom.html")
-
 
 def do_login(driver, url):
     wait = WebDriverWait(driver, 15)
@@ -102,8 +88,6 @@ def do_login(driver, url):
             wait.until(lambda d: url not in d.current_url)
             print(f"✅ Redirección exitosa a: {driver.current_url}")
         except TimeoutException:
-#            driver.save_screenshot("/app/captures/error_login.png")
-#            volcar_DOM(driver)
             exit_with_error(message=f"⚠️ Login unsuccessful, current URL: {driver.current_url}", driver=driver)
             # Aquí es donde el 403 suele ocurrir si detectan bot
 
@@ -210,17 +194,7 @@ def get_auth_token_logs(driver):
 
 def get_driver():
     chrome_options = uc.ChromeOptions()
-#    chrome_options.add_argument('--headless') # Si falla, probar sin headless una vez
-#    chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument("--disable-dev-shm-usage")
-#    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-#    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-#    chrome_options.add_experimental_option('useAutomationExtension', False)
-#     # Forzar un User-Agent de Windows común
-#    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
-#    # Directorio de descarga dentro del contenedor
-#    prefs = {"download.default_directory": "/tmp/"}
-#    chrome_options.add_experimental_option("prefs", prefs)
     chrome_options.add_argument('--headless=new') # Importante: usar el nuevo motor headless
     chrome_options.add_argument('--no-sandbox')
     chrome_options.add_argument('--window-size=1920,1080')
@@ -242,8 +216,6 @@ def get_vpn_config():
     try:
         do_login(driver, "https://sso.ipvanish.com/")
 
-        # Esperar a que se realicen las llamadas XHR tras login
-        #token = get_auth_token(driver)
         # Intentar extraer el token de los logs de ejecución
         token = get_auth_token_logs(driver)
         # Intentar extraer el token mediante JavaScript
@@ -267,7 +239,7 @@ def get_vpn_config():
             "Origin": "https://my.ipvanish.com/"
         })
 
-        # 2. Descargar JSON de servidores
+        # Descargar JSON de servidores
         try:
             resp_servers = session.get("https://account.ipvanish.com/api-v4/server")
             resp_servers.raise_for_status()
@@ -276,7 +248,7 @@ def get_vpn_config():
             exit_with_error(message=f"Error en lista de servidores: {e}", driver=driver)
             return
 
-        # 3. Filtrar por CountryCode y buscar la mayor Capacity
+        # Filtrar por CountryCode y buscar la mayor Capacity
         COUNTRY_FILTER = os.getenv("VPN_COUNTRY_CODE", "NL").strip().upper()
         filtered_servers = [s for s in servers if str(s.get("countryCode")).strip().upper() == COUNTRY_FILTER]
         if not filtered_servers:
@@ -299,7 +271,7 @@ def get_vpn_config():
             "Origin": "https://my.ipvanish.com/"
         })
 
-        # 4. Generar Payload y obtener configuración WireGuard
+        # Generar Payload y obtener configuración WireGuard
         payload = {
             "server": target_hostname,
             "allowlan": False,
@@ -322,7 +294,7 @@ def get_vpn_config():
             local_path = "/tmp/wireguard_config.conf"
             with open(local_path, "w") as f:
                 f.write(config_text)
-            print(f"Descarga completada en el contenedor.\nContenido del fichero '{local_path}':\n{config_text}")
+            print(f"📄 Descarga completada en el contenedor.\nContenido del fichero '{local_path}':\n{config_text}")
             return local_path
         elif config_response.status_code == 403:
             print("❌ Error 403: Acceso denegado. Posible falta de token o cabecera Referer.")
@@ -353,9 +325,6 @@ def upload_to_openwrt(local_path):
         )
 
         # Subir archivo
-#        sftp = ssh.open_sftp()
-#        sftp.put(local_path, "/root/vpn.conf")
-#        sftp.close()
         with SCPClient(ssh.get_transport()) as scp:
             scp.put(local_conf_path, "/root/vpn.conf")
 
