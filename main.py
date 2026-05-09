@@ -1,16 +1,22 @@
+import undetected_chromedriver as uc
+
 import json
 import os
 import time
 import requests
-from seleniumwire import webdriver
+import random
+#from seleniumwire import webdriver
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
+#from selenium.webdriver.chrome.options import Options
+#from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 
 import paramiko
+from scp import SCPClient
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,72 +26,234 @@ def exit_with_error(message, driver):
     driver.quit()
     exit(1)
 
-def get_vpn_config():
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    chrome_options.add_experimental_option('useAutomationExtension', False)
-    # Directorio de descarga dentro del contenedor
-    prefs = {"download.default_directory": "/tmp/"}
-    chrome_options.add_experimental_option("prefs", prefs)
+def rellenar_campo_react(driver, element, valor):
+    #print(f"{element.get_attribute('name')}\n{valor}")
 
-    service = Service(executable_path=os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver"))
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+    actions = ActionChains(driver)
+    # Mover el ratón al elemento con un pequeño offset aleatorio
+    actions.move_to_element_with_offset(element, random.randint(-5, 5), random.randint(-5, 5))
+    actions.pause(random.uniform(0.1, 0.3))
+    actions.click()
+    actions.perform()
+
+    element.click()
+    time.sleep(random.uniform(0.2, 0.5))
+    # Limpiamos usando teclas para disparar eventos de cambio
+    element.send_keys(Keys.CONTROL + "a")
+    element.send_keys(Keys.BACKSPACE)
+
+    # Escribimos el valor como lo haría un humano
+    # element.send_keys(valor)
+    for letra in valor:
+        element.send_keys(letra)
+        time.sleep(random.uniform(0.05, 0.25))
+
+    # Forzamos el evento 'input' y 'change' vía JS para que React lo vea
+    driver.execute_script("""
+        var element = arguments[0];
+        var value = arguments[1];
+        element.value = value;
+        ['input', 'change', 'blur'].forEach(eventName => {
+            element.dispatchEvent(new Event(eventName, { bubbles: true }));
+        })
+    """, element, valor)
+
+def volcar_DOM(driver):
+    # 1. Volcar el HTML a un archivo
+    dom_content = driver.page_source
+    with open("/app/captures/debug_dom.html", "w", encoding="utf-8") as f:
+        f.write(dom_content)
+
+    print("📄 DOM volcado en /app/captures/debug_dom.html")
+
+
+def do_login(driver, url):
+    wait = WebDriverWait(driver, 15)
+    print(f"⏳ Iniciando login en {url} ...")
+    try:
+        # Lógica de Login en IPVanish
+
+        driver.get(url)
+        # Esperar y rellenar usuario
+        wait.until(EC.presence_of_element_located((By.NAME, "email"))).send_keys(os.getenv("IPVANISH_USER"))
+        user_input = driver.find_element(By.CSS_SELECTOR, "input[name='email']")
+        rellenar_campo_react(driver, user_input, os.getenv("IPVANISH_USER"))
+
+        # Rellenar contraseña
+        wait.until(EC.presence_of_element_located((By.NAME, "password"))).send_keys(os.getenv("IPVANISH_PASS"))
+        pass_input = driver.find_element(By.CSS_SELECTOR, "input[name='password']")
+        rellenar_campo_react(driver, pass_input, os.getenv("IPVANISH_PASS"))
+
+        pass_input.send_keys(Keys.ENTER)
+        # Hacer clic en el botón "Sign in"
+#        boton_login = wait.until(
+#           EC.element_to_be_clickable((By.CSS_SELECTOR, "button[tabindex='3'][class^='button_btn']"))
+#        )
+#        boton_login.click()
+#        try:
+#            driver.execute_script("arguments[0].click();", boton_login)
+#        except:
+#            pass_input.send_keys(Keys.ENTER)
+
+        print("🚀 Intento de login enviado. Verificando cambio de URL...")
+        # Esperar específicamente a que la URL CAMBIE
+        try:
+            # Esperamos hasta 15 segundos a que la URL ya no sea la de SSO
+            wait.until(lambda d: url not in d.current_url)
+            print(f"✅ Redirección exitosa a: {driver.current_url}")
+        except TimeoutException:
+#            driver.save_screenshot("/app/captures/error_login.png")
+#            volcar_DOM(driver)
+            exit_with_error(message=f"⚠️ Login unsuccessful, current URL: {driver.current_url}", driver=driver)
+            # Aquí es donde el 403 suele ocurrir si detectan bot
+
+        print(f"Login successful, current URL: {driver.current_url}")
+
+    except TimeoutException:
+        exit_with_error(message="Could not access login page.", driver=driver)
+    except NoSuchElementException:
+        exit_with_error(message="Could not find button Login Submit. Exiting.", driver=driver)
+
+def get_auth_token(driver):
+    print("⏳ Esperando a que la aplicación realice peticiones a la API...")
+
+    token = None
+    max_retries = 30  # Intentar durante 30 segundos
+
+    for i in range(max_retries):
+        # Inspeccionar todas las peticiones capturadas hasta el momento
+        for request in driver.requests:
+            # Filtramos por la URL de la API para ser más precisos
+            if "ipvanish" in request.url:
+                auth_header = request.headers.get('Authorization')
+                if auth_header and "Bearer" in auth_header:
+                    token = auth_header
+                    print(f"✅ Token interceptado con éxito en la petición a: {request.url}")
+                    return token
+
+        for request in reversed(driver.requests):
+            # Buscamos en cualquier petición que vaya a la API
+            if "/api-v4/" in request.url:
+                auth = request.headers.get('Authorization')
+                if auth and "Bearer" in auth:
+                    token = auth
+                    print(f"✅ Token cazado: {token[:30]}...")
+                    return token
+
+        # Si no se encuentra, forzamos una navegación o esperamos
+        time.sleep(1)
+        if i == 5:
+            print("💡 Navegando explícitamente al panel para forzar peticiones API...")
+            driver.get("https://account.ipvanish.com/api-v4/customer/me")
+        if i == 15:
+            print("💡 Navegando explícitamente al panel para forzar peticiones API...")
+            driver.get("https://account.ipvanish.com/api-v4/impact/token")
+
+    if not token:
+        # Depuración total: si falla, listar todas las URLs intentadas
+        print("❌ No se encontró token. URLs interceptadas:")
+        for r in driver.requests[:10]: print(f" - {r.url}")
+
+    return token
+
+def get_auth_token_js(driver):
+    print("🔍 Buscando token en memoria del navegador...")
+
+    # Este script de JS busca en LocalStorage, SessionStorage y variables de Redux/Vuex comunes
+    js_script = """
+    return (function() {
+        // 1. Intentar Local y Session Storage
+        for (let i = 0; i < localStorage.length; i++) {
+            let key = localStorage.key(i);
+            if (key.includes('token') || key.includes('auth')) return localStorage.getItem(key);
+        }
+        for (let i = 0; i < sessionStorage.length; i++) {
+            let key = sessionStorage.key(i);
+            if (key.includes('token') || key.includes('auth')) return sessionStorage.getItem(key);
+        }
+        // 2. Intentar buscar en el objeto global si existe
+        return window.token || window.accessToken || null;
+    })();
+    """
+
+    token = driver.execute_script(js_script)
+
+    if token and not token.startswith("Bearer "):
+        token = f"Bearer {token}"
+
+    return token
+
+def get_auth_token_logs(driver):
+    print("🔍 Escaneando logs de red...")
+    logs = driver.get_log("performance")
+    for entry in logs:
+        try:
+            msg = json.loads(entry["message"])["message"]
+
+            # Solo nos interesan las peticiones que se van a enviar
+            if msg["method"] == "Network.requestWillBeSent":
+                params = msg.get("params", {})
+                request_data = params.get("request", {})
+                headers = request_data.get("headers", {})
+
+                # Buscar el token (insensible a mayúsculas/minúsculas)
+                auth = next((v for k, v in headers.items() if k.lower() == 'authorization'), None)
+
+                if auth and "Bearer" in auth:
+                    print(f"🎯 Token interceptado con éxito.")
+                    return auth
+        except (KeyError, ValueError, TypeError):
+            # Ignorar entradas malformadas o irrelevantes
+            continue
+
+    return None
+
+def get_driver():
+    chrome_options = uc.ChromeOptions()
+#    chrome_options.add_argument('--headless') # Si falla, probar sin headless una vez
+#    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument("--disable-dev-shm-usage")
+#    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+#    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+#    chrome_options.add_experimental_option('useAutomationExtension', False)
+#     # Forzar un User-Agent de Windows común
+#    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36")
+#    # Directorio de descarga dentro del contenedor
+#    prefs = {"download.default_directory": "/tmp/"}
+#    chrome_options.add_experimental_option("prefs", prefs)
+    chrome_options.add_argument('--headless=new') # Importante: usar el nuevo motor headless
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--window-size=1920,1080')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
+
+    driver = uc.Chrome(options=chrome_options, browser_executable_path="/usr/bin/google-chrome")
+
+    # Bypass manual de la propiedad 'webdriver'
+    driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+    })
+
+    return driver
+
+def get_vpn_config():
+    driver = get_driver()
 
     try:
-        try:
-            # Lógica de Login en IPVanish
-            driver.get("https://sso.ipvanish.com/")
-            # Esperar y rellenar usuario
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.NAME, "email"))
-            ).send_keys(os.getenv("IPVANISH_USER"))
-
-            # Rellenar contraseña
-            driver.find_element(By.NAME, "password").send_keys(os.getenv("IPVANISH_PASS"))
-
-            # Hacer clic en el botón "Sign in"
-            boton_login = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "button[tabindex='3'][class^='button_btn']"))
-            )
-            boton_login.click()
-
-            print("Login successful.")
-
-        except TimeoutException:
-            exit_with_error(message="Could not access login page.", driver=driver)
-        except NoSuchElementException:
-            exit_with_error(message="Could not find button Login Submit. Exiting.", driver=driver)
+        do_login(driver, "https://sso.ipvanish.com/")
 
         # Esperar a que se realicen las llamadas XHR tras login
-        time.sleep(5)
+        #token = get_auth_token(driver)
+        # Intentar extraer el token de los logs de ejecución
+        token = get_auth_token_logs(driver)
+        # Intentar extraer el token mediante JavaScript
+        if not token:
+            token = get_auth_token_js(driver)
 
-        token = None
-
-        # Intentar extraer el token del LocalStorage (común en apps modernas)
-        token = driver.execute_script("return window.localStorage.getItem('auth_token');")
-        # Si no está ahí, a veces está bajo otro nombre como 'token' o 'accessToken'
         if not token:
-            token = driver.execute_script("return window.localStorage.getItem('token');")
-        # Si sigue sin aparecer, podemos interceptarlo del sessionStorage
-        if not token:
-            token = driver.execute_script("return window.sessionStorage.getItem('auth_token');")
-        # Inspeccionar las peticiones realizadas por el navegador
-        if not token:
-            for request in driver.requests:
-                if request.headers.get('Authorization'):
-                    auth_header = request.headers['Authorization']
-                    if "Bearer" in auth_header:
-                        token = auth_header # Ya contiene 'Bearer ...'
-                        print("✅ Token interceptado del tráfico XHR")
-                        break
-        if not token:
-            print("⚠️ No se encontró el token en Storage. Revisa el nombre de la clave en el navegador.")
+            exit_with_error(message="⚠️ No se encontró el token. Revisa el nombre de la clave en el navegador.", driver=driver)
         else:
-            print("✅ Token de autorización capturado.")
+            print(f"✅ Token de autorización capturado: {token}")
 
         # Extraer las cookies de Selenium para usarlas con la librería requests
         session = requests.Session()
@@ -94,7 +262,7 @@ def get_vpn_config():
         session.headers.update({
             "User-Agent": user_agent,
             "Accept": "application/json, text/plain, */*",
-            "Authorization": f"Bearer {token}",
+            "Authorization": f"{token}",
             "Referer": "https://my.ipvanish.com/",
             "Origin": "https://my.ipvanish.com/"
         })
@@ -123,6 +291,14 @@ def get_vpn_config():
         target_hostname = best_server['hostname']
         print(f"Server selected: {target_hostname} (Capacidad: {best_server['capacity']})")
 
+        session.headers.update({
+            "User-Agent": user_agent,
+            "Accept": "application/json, text/plain, */*",
+            "Authorization": f"{token}",
+            "Referer": "https://my.ipvanish.com/",
+            "Origin": "https://my.ipvanish.com/"
+        })
+
         # 4. Generar Payload y obtener configuración WireGuard
         payload = {
             "server": target_hostname,
@@ -146,7 +322,7 @@ def get_vpn_config():
             local_path = "/tmp/wireguard_config.conf"
             with open(local_path, "w") as f:
                 f.write(config_text)
-            print("Descarga completada en el contenedor.")
+            print(f"Descarga completada en el contenedor.\nContenido del fichero '{local_path}':\n{config_text}")
             return local_path
         elif config_response.status_code == 403:
             print("❌ Error 403: Acceso denegado. Posible falta de token o cabecera Referer.")
@@ -160,25 +336,37 @@ def get_vpn_config():
         driver.quit()
 
 def upload_to_openwrt(local_path):
+    print(f"🚀 Copiando fichero '{local_path}' al router OpeWrt por SFTP")
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-    ssh.connect(
-        os.getenv("ROUTER_IP"),
-        username="root",
-        password=os.getenv("ROUTER_PASS")
-    )
+    try:
+        ssh.connect(
+            os.getenv("ROUTER_IP"),
+            username="root",
+            password=os.getenv("ROUTER_PASS"),
+            look_for_keys=False,
+            allow_agent=False,
+            # Forzar algoritmos de intercambio de llaves más compatibles
+            disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']},
+            banner_timeout=30 # Dar más tiempo al router para responder
+        )
 
-    # Subir archivo
-    sftp = ssh.open_sftp()
-    sftp.put(local_path, "/root/vpn.conf")
-    sftp.close()
+        # Subir archivo
+#        sftp = ssh.open_sftp()
+#        sftp.put(local_path, "/root/vpn.conf")
+#        sftp.close()
+        with SCPClient(ssh.get_transport()) as scp:
+            scp.put(local_conf_path, "/root/vpn.conf")
 
-    # Ejecutar script de actualización en OpenWrt
-    ssh.exec_command("/usr/bin/update_wg.sh")
-    ssh.close()
-    print("Router actualizado correctamente.")
+        # Ejecutar script de actualización en OpenWrt
+        print("Aplicando actualización de VPN en router OpenWrt")
+        ssh.exec_command("/bin/sh /usr/bin/update_wg.sh")
+        ssh.close()
+        print("✅ Router actualizado correctamente.")
+    except Exception as e:
+        print(f"Error al aplicar la configuración en el route OpenWRT: {e}")
 
 if __name__ == "__main__":
     path = get_vpn_config()
-#    upload_to_openwrt(path)
+    upload_to_openwrt(path)
