@@ -308,7 +308,7 @@ def get_vpn_config():
         driver.quit()
 
 def upload_to_openwrt(local_path):
-    print(f"🚀 Copiando fichero '{local_path}' al router OpeWrt por SFTP")
+    print(f"🚀 Copiando fichero '{local_path}' al router OpenWRT por SSH cp")
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -326,13 +326,26 @@ def upload_to_openwrt(local_path):
 
         # Subir archivo
         with SCPClient(ssh.get_transport()) as scp:
-            scp.put(local_conf_path, "/root/vpn.conf")
+            scp.put(local_path, "/root/vpn.conf")
 
         # Ejecutar script de actualización en OpenWrt
-        print("Aplicando actualización de VPN en router OpenWrt")
-        ssh.exec_command("/bin/sh /usr/bin/update_wg.sh")
+        print(f"⚙️ Aplicando actualización de VPN en router OpenWRT")
+
+        # Usa la ruta completa del intérprete y el script
+        comando = "/bin/sh /usr/bin/update_wg.sh"
+
+        stdin, stdout, stderr = ssh.exec_command(comando)
+
+        # MUY IMPORTANTE: Leer la salida bloquea el script hasta que termine
+        # Si no lees stdout, la conexión puede cerrarse antes de que el router procese el comando
+        exit_status = stdout.channel.recv_exit_status()
+
+        if exit_status != 0:
+            print(f"❌ Error en el script: {stderr.read().decode()}")
+        else:
+            print("✅ Router actualizado correctamente.")
+
         ssh.close()
-        print("✅ Router actualizado correctamente.")
     except Exception as e:
         print(f"Error al aplicar la configuración en el router OpenWRT: {e}")
 
