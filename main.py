@@ -1,4 +1,6 @@
 import undetected_chromedriver as uc
+import shutil
+import platform
 
 import json
 import os
@@ -48,7 +50,7 @@ def get_driver():
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     chrome_options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
 
-    driver = uc.Chrome(options=chrome_options, browser_executable_path="/usr/bin/google-chrome")
+    driver = uc.Chrome(version_main=148,options=chrome_options, browser_executable_path="/usr/bin/google-chrome")
 
     # Bypass manual de la propiedad 'webdriver'
     driver.execute_cdp_cmd('Network.setUserAgentOverride', {
