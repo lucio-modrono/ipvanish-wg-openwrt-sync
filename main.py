@@ -18,6 +18,45 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+def limpiar_cache_uc():
+    # Detectar el sistema operativo para encontrar la ruta correcta
+    sistema = platform.system()
+    
+    if sistema == "Windows":
+        ruta_cache = os.path.join(os.environ.get('APPDATA', ''), 'undetected_chromedriver')
+    elif sistema == "Linux" or sistema == "Darwin":  # Darwin es macOS
+        ruta_cache = os.path.expanduser('~/.local/share/undetected_chromedriver')
+    else:
+        return # Sistema no soportado, continuar sin borrar
+
+    # Borrar la carpeta si existe
+    if os.path.exists(ruta_cache):
+        try:
+            shutil.rmtree(ruta_cache)
+            print(f"Caché de undetected_chromedriver borrada con éxito: {ruta_cache}")
+        except Exception as e:
+            print(f"No se pudo borrar la caché: {e}")
+
+def get_driver():
+    limpiar_cache_uc()
+    
+    chrome_options = uc.ChromeOptions()
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument('--headless=new') # Importante: usar el nuevo motor headless
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--window-size=1920,1080')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
+
+    driver = uc.Chrome(options=chrome_options, browser_executable_path="/usr/bin/google-chrome")
+
+    # Bypass manual de la propiedad 'webdriver'
+    driver.execute_cdp_cmd('Network.setUserAgentOverride', {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+    })
+
+    return driver
+
 def exit_with_error(message, driver):
     print(str(message))
     driver.quit()
@@ -191,24 +230,6 @@ def get_auth_token_logs(driver):
             continue
 
     return None
-
-def get_driver():
-    chrome_options = uc.ChromeOptions()
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument('--headless=new') # Importante: usar el nuevo motor headless
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--window-size=1920,1080')
-    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-    chrome_options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
-
-    driver = uc.Chrome(options=chrome_options, browser_executable_path="/usr/bin/google-chrome")
-
-    # Bypass manual de la propiedad 'webdriver'
-    driver.execute_cdp_cmd('Network.setUserAgentOverride', {
-        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
-    })
-
-    return driver
 
 def get_vpn_config():
     driver = get_driver()
